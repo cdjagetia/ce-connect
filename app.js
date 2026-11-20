@@ -33,9 +33,11 @@ const T = {
     installHint: '📲 इसे फ़ोन की होम स्क्रीन पर लगाएँ: ब्राउज़र मेन्यू ⋮ → "Add to Home screen"', install: 'होम स्क्रीन पर लगाएँ',
     demo: 'DEMO मोड — sample data, कुछ सेव नहीं होगा। रोल बदलकर देखें:', help: 'मदद', status_New: 'नया', status_Filed: 'फाइल हुआ', status_Query: 'सवाल है', status_Open: 'खुला', status_InProgress: 'चालू', status_Done: 'पूरा',
     sessionExpired: 'सेशन खत्म — दोबारा लॉगिन करें', err: 'गड़बड़ हुई', needFile: 'पहले फोटो या PDF चुनें', needParty: 'Party का नाम लिखें',
-    reqTypes: { 'Invoice': '🧾 इनवॉइस चाहिए', 'Ledger': '📒 लेजर चाहिए', 'New Bill': '🆕 नया बिल बनवाना', 'Payment': '💰 पेमेंट की जानकारी', 'Document': '📄 कागज़ / डॉक्यूमेंट', 'Other': '💬 अन्य' },
+    reqTypes: { 'Diesel Payment': '⛽ डीज़ल पेमेंट', 'Invoice': '🧾 इनवॉइस चाहिए', 'Ledger': '📒 लेजर चाहिए', 'New Bill': '🆕 नया बिल बनवाना', 'Payment': '💰 पेमेंट की जानकारी', 'Document': '📄 कागज़ / डॉक्यूमेंट', 'Other': '💬 अन्य' },
     docTypes: { 'Purchase Bill': '🧾 खरीद बिल (Purchase)', 'Diesel Slip': '⛽ डीज़ल पर्ची', 'Loan Papers': '🏦 लोन / EMI कागज़', 'Work Order': '📋 वर्क ऑर्डर', 'Other': '📄 अन्य' },
-    dr: 'नाम', cr: 'जमा'
+    dr: 'नाम', cr: 'जमा',
+    fuel: '⛽ डीज़ल एंट्री', fuelSub: 'भराई दर्ज करें — फ़ोटो + लोकेशन', fuelRoom: 'डीज़ल कंट्रोल रूम', fuelRoomSub: 'एवरेज, अलर्ट, पेंडिंग पेमेंट',
+    print: 'प्रिंट / PDF', syncOk: 'Tally sync ठीक', syncLate: 'Tally sync देर से', syncBad: 'Tally sync में दिक्कत', fuelPerm: 'डीज़ल एंट्री की अनुमति'
   },
   en: {
     login: 'Login', mobile: 'Mobile number', pin: 'PIN (4–6 digits)', loginPin: 'Login with Mobile + PIN', or: 'or', loginGoogle: 'Login with Gmail',
@@ -57,9 +59,11 @@ const T = {
     installHint: '📲 Add to home screen: browser menu ⋮ → "Add to Home screen"', install: 'Install app',
     demo: 'DEMO mode — sample data, nothing is saved. Try a role:', help: 'Help', status_New: 'New', status_Filed: 'Filed', status_Query: 'Query', status_Open: 'Open', status_InProgress: 'In progress', status_Done: 'Done',
     sessionExpired: 'Session expired — please login again', err: 'Something went wrong', needFile: 'Choose a photo or PDF first', needParty: 'Enter party name',
-    reqTypes: { 'Invoice': '🧾 Need invoice', 'Ledger': '📒 Need ledger', 'New Bill': '🆕 Make new bill', 'Payment': '💰 Payment info', 'Document': '📄 Document', 'Other': '💬 Other' },
+    reqTypes: { 'Diesel Payment': '⛽ Diesel payment', 'Invoice': '🧾 Need invoice', 'Ledger': '📒 Need ledger', 'New Bill': '🆕 Make new bill', 'Payment': '💰 Payment info', 'Document': '📄 Document', 'Other': '💬 Other' },
     docTypes: { 'Purchase Bill': '🧾 Purchase bill', 'Diesel Slip': '⛽ Diesel slip', 'Loan Papers': '🏦 Loan / EMI papers', 'Work Order': '📋 Work order', 'Other': '📄 Other' },
-    dr: 'Dr', cr: 'Cr'
+    dr: 'Dr', cr: 'Cr',
+    fuel: '⛽ Diesel entry', fuelSub: 'Record a fill — photo + location', fuelRoom: 'Diesel control room', fuelRoomSub: 'Average, alerts, pending payments',
+    print: 'Print / PDF', syncOk: 'Tally sync OK', syncLate: 'Tally sync delayed', syncBad: 'Tally sync problem', fuelPerm: 'Diesel entry allowed'
   }
 };
 const t = k => (T[state.lang] && T[state.lang][k] !== undefined) ? T[state.lang][k] : (T.en[k] !== undefined ? T.en[k] : k);
@@ -103,7 +107,7 @@ async function flushQueue() {
   try {
     const items = await Q.all();
     for (const it of items) {
-      try { await api('uploadDoc', it.payload); await Q.del(it.qid); toast(t('uploaded')); }
+      try { await api(it.action || 'uploadDoc', it.payload); await Q.del(it.qid); toast(it.action === 'fuelSave' ? '⛽ ' + t('uploaded') : t('uploaded')); }
       catch (e) { if (e.message === 'AUTH') break; if (!navigator.onLine) break; }
     }
   } catch (e) {} finally { flushing = false; refreshQueueBar(); }
@@ -207,7 +211,9 @@ routes.home = async function () {
   const u = state.user;
   const tiles = [];
   if (can('dashboard')) tiles.push(['dashboard', '📊', t('dashboard'), t('dashboardSub'), 'primary']);
-  if (can('upload')) tiles.push(['upload', '📤', t('upload'), t('uploadSub'), can('dashboard') ? '' : 'primary']);
+  if (can('fuelEntry')) tiles.push(['fuel', '⛽', t('fuel'), t('fuelSub'), 'gold']);
+  if (can('fuelView')) tiles.push(['fuelroom', '🛡️', t('fuelRoom'), t('fuelRoomSub')]);
+  if (can('upload')) tiles.push(['upload', '📤', t('upload'), t('uploadSub'), can('dashboard') || can('fuelEntry') ? '' : 'primary']);
   if (can('invoices')) tiles.push(['invoices', '🧾', t('invoices'), t('invoicesSub')]);
   tiles.push(['requests', '💬', t('requests'), t('requestsSub')]);
   if (can('ledgers')) tiles.push(['ledgers', '📒', t('ledgers'), t('ledgersSub')]);
@@ -215,16 +221,18 @@ routes.home = async function () {
   if (can('users')) tiles.push(['users', '👥', t('users'), t('usersSub')]);
   tiles.push(['profile', '⚙️', t('profile'), u.mobile || u.email || '']);
   $app.innerHTML = `
-    <div class="card hello"><div class="mid">🙏 ${t('hello')}, ${esc(u.role === 'OWNER' ? (u.name.indexOf('Choudhary') >= 0 ? u.name : u.name + ' जी') : u.name)}</div><div class="muted small">${esc(u.roleLabel || '')}${u.site ? ' · ' + esc(u.site) : ''}</div></div>
-    <div id="homeKpi"></div>
+    <div class="card hello"><div class="eyebrow">Choudhary Enterprises · CE Connect</div><div class="mid" style="margin-top:4px">🙏 ${t('hello')}, ${esc(u.role === 'OWNER' ? (u.name.indexOf('Choudhary') >= 0 ? u.name : u.name + ' जी') : u.name)}</div><div class="muted small">${esc(u.roleLabel || '')}${u.site ? ' · ' + esc(u.site) : ''}</div></div>
+    <div id="homeHealth"></div><div id="homeKpi"></div><div id="homeFuel"></div>
     <div class="tiles">${tiles.map(x => `<a class="tile ${x[4] || ''}" href="#${x[0]}"><span class="ic">${x[1]}</span>${esc(x[2])}<small>${esc(x[3])}</small></a>`).join('')}</div>
     ${installCard()}
-    <div class="foot">${esc(CFG.FIRM_NAME)} · 📞 ${esc(CFG.FIRM_PHONE)}</div>`;
+    <div class="foot">System by <b>${esc(CFG.FIRM_NAME)}</b> · 📞 ${esc(CFG.FIRM_PHONE)}</div>`;
   bindInstall();
   if (can('dashboard')) {
     try {
       const d = await api('dashboard');
       const el = document.getElementById('homeKpi'); if (!el) return;
+      if (can('syncHealth')) document.getElementById('homeHealth').innerHTML = healthHtml(d.sync);
+      if (d.fuel) document.getElementById('homeFuel').innerHTML = `<a class="card fuelcard" href="#fuelroom" style="display:block;text-decoration:none;color:inherit"><div class="row"><div><div class="sec">⛽ डीज़ल · इस महीने</div><div class="big" style="font-size:22px">${Math.round(d.fuel.monthL).toLocaleString('en-IN')} L · ${inr(d.fuel.monthAmt)}</div><div class="small muted">आज ${d.fuel.todayN} भराई · ${inr(d.fuel.todayAmt)} &nbsp;|&nbsp; पेंडिंग पेमेंट ${d.fuel.pendingN} · ${inr(d.fuel.pendingAmt)}</div></div><div style="flex:0 0 auto;text-align:center"><span class="badge ${d.fuel.red ? 'RED' : 'OK'}" style="font-size:13px">🔴 RED ${d.fuel.red}</span></div></div></a>`;
       el.innerHTML = `<div class="kpis" style="margin-bottom:12px">
         <div class="kpi in"><div class="l">${t('inMoney')} · ${fmtDate(d.lastDay.date)}</div><div class="v">${inr(d.lastDay.inTotal)}</div></div>
         <div class="kpi out"><div class="l">${t('outMoney')} · ${fmtDate(d.lastDay.date)}</div><div class="v">${inr(d.lastDay.outTotal)}</div></div>
@@ -233,6 +241,14 @@ routes.home = async function () {
     } catch (e) {}
   }
 };
+
+function healthHtml(s) {
+  if (!s) return `<div class="health warn"><span class="dot"></span>${t('syncLate')} — अभी तक कोई sync नहीं</div>`;
+  const cls = s.status === 'ERROR' ? 'bad' : (s.status === 'CHECK' || s.ageMin > 180) ? 'warn' : 'ok';
+  const lbl = cls === 'ok' ? t('syncOk') : cls === 'bad' ? t('syncBad') : t('syncLate');
+  const age = s.ageMin < 60 ? s.ageMin + ' मिनट पहले' : Math.round(s.ageMin / 60) + ' घंटे पहले';
+  return `<div class="health ${cls}"><span class="dot"></span><div style="flex:1">${lbl} · ${age}<div class="small" style="font-weight:500;opacity:.85">${esc(s.ledgers)} ledgers · ${esc(s.entries)} entries · ${esc(s.note || '')}</div></div></div>`;
+}
 
 routes.invoices = async function (p) {
   $app.innerHTML = `<h2>🧾 ${t('invoices')}</h2>
@@ -394,15 +410,17 @@ routes.ledger = async function (p) {
   const L = r.ledger, rows = r.rows;
   const totDr = rows.reduce((s, x) => s + x.debit, 0), totCr = rows.reduce((s, x) => s + x.credit, 0);
   const last = rows.length ? rows[rows.length - 1].balance : L.opening;
-  $app.innerHTML = `<div class="card"><h2 style="margin:0">${esc(L.name)}</h2><div class="small muted">${esc(L.group)} ${L.gstin ? '· GSTIN ' + esc(L.gstin) : ''}</div>
+  $app.innerHTML = `<div class="print-only lh"><div><b>Choudhary Enterprises</b><div class="small muted">Ledger Account · ${esc(L.name)}</div></div><div class="small" style="text-align:right">${p.from ? fmtDate(p.from) : 'From start'} – ${p.to ? fmtDate(p.to) : fmtDate(new Date().toISOString())}<br>Prepared by ${esc(CFG.FIRM_NAME)}</div></div>
+    <div class="card"><h2 style="margin:0">${esc(L.name)}</h2><div class="small muted">${esc(L.group)} ${L.gstin ? '· GSTIN ' + esc(L.gstin) : ''}</div>
       <div class="kpis" style="margin-top:12px"><div class="kpi"><div class="l">${t('opening')}</div><div class="v">${inr(L.opening)} <small>${drcr(L.opening)}</small></div></div>
       <div class="kpi"><div class="l">${t('closing')}</div><div class="v">${inr(last)} <small>${drcr(last)}</small></div></div></div>
       <div class="row" style="margin-top:10px"><div><label>${t('from')}</label><input type="date" id="f" value="${esc(p.from || '')}"></div><div><label>${t('to')}</label><input type="date" id="tt" value="${esc(p.to || '')}"></div></div>
-      <div class="row wrap" style="margin-top:10px;gap:8px"><button id="apply" class="btn sm ghost">✓ ${t('from')}–${t('to')}</button><button id="shareSum" class="btn sm alt">${t('shareText')}</button><a class="btn sm" href="#newrequest?type=Ledger&subject=${encodeURIComponent('Ledger: ' + L.name)}&message=${encodeURIComponent('DSC signed ledger required: ' + L.name + (p.from ? ' from ' + fmtDate(p.from) : '') + (p.to ? ' to ' + fmtDate(p.to) : ''))}">${t('askSigned')}</a></div></div>
+      <div class="row wrap no-print" style="margin-top:10px;gap:8px"><button id="apply" class="btn sm ghost">✓ ${t('from')}–${t('to')}</button><button id="shareSum" class="btn sm alt">${t('shareText')}</button><button id="prt" class="btn sm ghost">🖨️ ${t('print')}</button><a class="btn sm" href="#newrequest?type=Ledger&subject=${encodeURIComponent('Ledger: ' + L.name)}&message=${encodeURIComponent('DSC signed ledger required: ' + L.name + (p.from ? ' from ' + fmtDate(p.from) : '') + (p.to ? ' to ' + fmtDate(p.to) : ''))}">${t('askSigned')}</a></div></div>
     <div class="card" style="padding:0;overflow-x:auto"><table class="led"><thead><tr><th>Date</th><th>Particulars</th><th class="n">${t('dr')}</th><th class="n">${t('cr')}</th><th class="n">Bal</th></tr></thead><tbody>
       ${rows.map(x => `<tr><td>${fmtDate(x.date)}</td><td><b>${esc(x.other || x.vchType)}</b><div class="s muted">${esc(x.vchType)} ${esc(x.vchNo)}${x.narration ? ' · ' + esc(x.narration) : ''}</div></td><td class="n">${x.debit ? inr2(x.debit) : ''}</td><td class="n">${x.credit ? inr2(x.credit) : ''}</td><td class="n">${inr(x.balance)} ${drcr(x.balance)}</td></tr>`).join('') || `<tr><td colspan="5" class="center muted">${t('noData')}</td></tr>`}
       <tr><td></td><td><b>Total</b></td><td class="n"><b>${inr2(totDr)}</b></td><td class="n"><b>${inr2(totCr)}</b></td><td></td></tr></tbody></table></div>
     <div class="foot">${r.syncedAt ? t('synced') + ': ' + fmtDT(r.syncedAt) : ''}</div>`;
+  document.getElementById('prt').onclick = () => window.print();
   document.getElementById('apply').onclick = () => go(`ledger?name=${encodeURIComponent(L.name)}&company=${encodeURIComponent(L.company)}&from=${document.getElementById('f').value}&to=${document.getElementById('tt').value}`);
   document.getElementById('shareSum').onclick = async () => {
     const txt = `📒 ${L.name}\n${p.from ? fmtDate(p.from) : ''}${p.to ? ' – ' + fmtDate(p.to) : ''}\n${t('opening')}: ${inr2(L.opening)} ${drcr(L.opening)}\n${t('dr')}: ${inr2(totDr)}\n${t('cr')}: ${inr2(totCr)}\n${t('closing')}: ${inr2(last)} ${drcr(last)}\n— ${CFG.FIRM_NAME}`;
@@ -438,16 +456,17 @@ routes.users = async function (p) {
       <label>${t('role')}</label><select id="r">${r.roles.map(x => `<option value="${x.key}" ${x.key === edit.role ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
       <label>${t('site')}</label><input id="s" value="${esc(edit.site || '')}">
       <label>${t('setPin')} ${edit.hasPin ? '✅' : ''}</label><input id="pn" inputmode="numeric" maxlength="6">
+      <label>${t('fuelPerm')}</label><select id="fe"><option value="N">${t('no')}</option><option value="Y" ${edit.fuelEntry === 'Y' ? 'selected' : ''}>${t('yes')}</option></select>
       <label>${t('activeQ')}</label><select id="a"><option value="Y">${t('yes')}</option><option value="N" ${edit.active === 'N' ? 'selected' : ''}>${t('no')}</option></select>
       <div style="height:14px"></div><button id="sv" class="btn block">${t('save')}</button></div>`;
     document.getElementById('sv').onclick = async () => {
-      try { await api('saveUser', { user: { id: edit.id, name: v('n'), mobile: v('m'), email: v('e'), role: v('r'), site: v('s'), pin: v('pn'), active: v('a') } }); toast('✅'); go('users'); } catch (e) { toast(e.message); }
+      try { await api('saveUser', { user: { id: edit.id, name: v('n'), mobile: v('m'), email: v('e'), role: v('r'), site: v('s'), pin: v('pn'), active: v('a'), fuelEntry: v('fe') } }); toast('✅'); go('users'); } catch (e) { toast(e.message); }
     };
     return;
   }
   $app.innerHTML = `<h2>👥 ${t('users')}</h2><a class="btn alt block" href="#users?new=1">${t('addUser')}</a><div style="height:12px"></div>
     <div class="card list">${r.items.map(x => `<a class="item" style="text-decoration:none;color:inherit" href="#users?id=${x.id}"><span class="ic">${x.role === 'OWNER' ? '👑' : x.role.indexOf('FIRM') >= 0 || x.role === 'ADMIN' ? '🏢' : '👷'}</span>
-      <div class="main"><div class="t">${esc(x.name)} ${x.active === 'N' ? '⛔' : ''}</div><div class="s">${esc(x.roleLabel)} · ${esc(x.mobile)} ${esc(x.email)} ${x.site ? '· ' + esc(x.site) : ''}</div><div class="s">${x.hasPin ? '🔢 PIN' : ''} ${x.email ? 'G Gmail' : ''} ${x.lastLogin ? '· ' + fmtDT(x.lastLogin) : ''}</div></div></a>`).join('')}</div>`;
+      <div class="main"><div class="t">${esc(x.name)} ${x.active === 'N' ? '⛔' : ''}</div><div class="s">${esc(x.roleLabel)} · ${esc(x.mobile)} ${esc(x.email)} ${x.site ? '· ' + esc(x.site) : ''}</div><div class="s">${x.hasPin ? '🔢 PIN' : ''} ${x.email ? 'G Gmail' : ''} ${x.fuelEntry === 'Y' ? '⛽' : ''} ${x.lastLogin ? '· ' + fmtDT(x.lastLogin) : ''}</div></div></a>`).join('')}</div>`;
 };
 const v = id => document.getElementById(id).value.trim();
 
@@ -464,6 +483,191 @@ routes.profile = async function () {
   document.getElementById('lo').onclick = async () => { try { await api('logout'); } catch (e) {} logoutLocal(); render(); };
 };
 
+
+// ───────────── ⛽ Diesel — supervisor entry ─────────────
+const F = { meta: store.get('fuelMeta', null), v: null, gps: null, photos: { meter: '', slip: '', pump: '' } };
+routes.fuel = async function () {
+  if (!can('fuelEntry')) return go('home');
+  F.photos = { meter: '', slip: '', pump: '' }; F.v = null;
+  $app.innerHTML = '<div class="spinner"></div>';
+  try { F.meta = await api('fuelMeta'); store.set('fuelMeta', F.meta); } catch (e) { if (!F.meta) throw e; }
+  const m = F.meta;
+  if (!m.vehicles.length) { $app.innerHTML = `<div class="card center">⛽<br><b>अभी कोई गाड़ी दर्ज नहीं है</b><div class="small muted" style="margin-top:6px">ऑफ़िस से Vehicles लिस्ट भरवाएँ।</div></div>`; return; }
+  $app.innerHTML = `
+  <div class="card">
+    <div class="sec"><b>1</b>गाड़ी</div>
+    <label>साइट</label><select id="fSite">${m.sites.map(x => `<option value="${esc(x.code)}">${esc(x.name)} (${esc(x.code)})</option>`).join('')}</select>
+    <label>गाड़ी नंबर</label><select id="fVeh"></select>
+    <div id="fInfo" class="info3" hidden>
+      <div class="pill"><small>पिछली रीडिंग</small><strong id="iPrev">—</strong></div>
+      <div class="pill"><small>पिछली भराई</small><strong id="iLast" style="font-size:12px">—</strong></div>
+      <div class="pill"><small>टंकी क्षमता</small><strong id="iTank">—</strong></div>
+    </div>
+    <div class="row"><div><label>ड्राइवर का नाम</label><input id="fDn" placeholder="पूरा नाम"></div><div><label>ड्राइवर मोबाइल</label><input id="fDm" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंक"></div></div>
+  </div>
+  <div class="card">
+    <div class="sec"><b>2</b>मीटर और डीज़ल</div>
+    <label id="fLblR">अभी की मीटर रीडिंग</label><input id="fRead" type="number" inputmode="decimal" placeholder="जैसे 45210">
+    <div class="calc"><span>पिछली भराई से चली</span><strong id="fRun">—</strong></div>
+    <div class="row"><div><label>डीज़ल (लीटर)</label><input id="fLit" type="number" inputmode="decimal" placeholder="0.00"></div><div><label>रेट (₹/लीटर)</label><input id="fRate" type="number" inputmode="decimal" placeholder="0.00" value="${esc(store.get('fuelRate', ''))}"></div></div>
+    <label>कुल राशि (₹)</label><input id="fAmt" type="number" inputmode="decimal" placeholder="अपने-आप भरेगी">
+    <div class="toggle"><div>टंकी फुल भराई?<small>फुल टंकी से ही सही एवरेज निकलता है</small></div><label class="switch"><input type="checkbox" id="fFull" checked><span class="slider"></span></label></div>
+    <div class="row"><div><label>पंप का नाम</label><input id="fPump" list="fPumps" placeholder="पंप"><datalist id="fPumps"></datalist></div><div><label>स्लिप नंबर</label><input id="fSlip" placeholder="स्लिप पर लिखा नंबर"></div></div>
+  </div>
+  <div class="card">
+    <div class="sec"><b>3</b>सबूत — फ़ोटो और लोकेशन</div>
+    <div class="photos">
+      <div class="shot" data-k="meter"><span class="tag r">ज़रूरी</span>🧭<br>मीटर / ओडोमीटर</div>
+      <div class="shot" data-k="slip"><span class="tag r">ज़रूरी</span>🧾<br>पंप की स्लिप</div>
+      <div class="shot" data-k="pump"><span class="tag o">वैकल्पिक</span>⛽<br>पंप डिस्प्ले</div>
+    </div>
+    <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+    <p class="small muted">फ़ोटो पर गाड़ी नंबर, तारीख़-समय और लोकेशन अपने-आप छप जाएगी।</p>
+    <label>लोकेशन</label><div class="gps wait" id="fGps"><span class="dot"></span><span id="fGpsT">लोकेशन ली जा रही है…</span></div>
+    <label>टिप्पणी (वैकल्पिक)</label><textarea id="fRem" rows="2" style="min-height:60px" placeholder="कोई ख़ास बात"></textarea>
+  </div>
+  <button id="fSave" class="btn gold block">✓ एंट्री सेव करें</button>`;
+  const $ = id => document.getElementById(id);
+  const onSite = () => {
+    const code = $('fSite').value, vs = m.vehicles.filter(v => v.site === code), site = m.sites.find(x => x.code === code) || {};
+    $('fVeh').innerHTML = '<option value="">— गाड़ी चुनें —</option>' + vs.map(v => `<option value="${esc(v.no)}">${esc(v.no)}${v.type ? ' · ' + esc(v.type) : ''}</option>`).join('');
+    $('fPumps').innerHTML = (site.pumps || []).map(x => `<option value="${esc(x)}">`).join('');
+    if ((site.pumps || []).length === 1) $('fPump').value = site.pumps[0];
+    $('fInfo').hidden = true; F.v = null; calc();
+  };
+  const calc = () => {
+    const lit = parseFloat($('fLit').value), rate = parseFloat($('fRate').value);
+    if (lit > 0 && rate > 0) $('fAmt').value = (lit * rate).toFixed(2);
+    let txt = '—'; const cur = parseFloat($('fRead').value);
+    if (F.v && !isNaN(cur)) txt = F.v.first ? 'पहली एंट्री' : ((cur - F.v.prev).toFixed(1) + (F.v.meter === 'HR' ? ' घंटे' : ' km'));
+    $('fRun').textContent = txt;
+  };
+  $('fSite').onchange = onSite;
+  $('fVeh').onchange = async () => {
+    const no = $('fVeh').value; if (!no) { $('fInfo').hidden = true; F.v = null; return; }
+    const vm = m.vehicles.find(v => v.no === no);
+    $('fLblR').textContent = vm.meter === 'HR' ? 'अभी की घंटा मीटर (HMR) रीडिंग' : 'अभी की ओडोमीटर (KM) रीडिंग';
+    try { F.v = await api('fuelVehicleStatus', { vehicle: no }); $('fInfo').hidden = false;
+      $('iPrev').textContent = Number(F.v.prev).toLocaleString('en-IN') + (F.v.meter === 'HR' ? ' hr' : ' km'); $('iLast').textContent = F.v.lastAt; $('iTank').textContent = (F.v.tank || '—') + ' L';
+    } catch (e) { F.v = null; toast('📶 ऑफ़लाइन — पिछली रीडिंग बाद में मिलाई जाएगी'); }
+    calc();
+  };
+  ['fRead', 'fLit', 'fRate'].forEach(id => $(id).oninput = calc);
+  let shotKey = '';
+  document.querySelectorAll('.shot').forEach(el => el.onclick = () => { shotKey = el.dataset.k; $('fCam').click(); });
+  $('fCam').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { F.photos[shotKey] = await stampPhoto(f, $('fVeh').value); const el = document.querySelector(`.shot[data-k="${shotKey}"]`); el.classList.add('done');
+      el.querySelector('img') && el.querySelector('img').remove(); const im = new Image(); im.src = F.photos[shotKey]; el.appendChild(im);
+    } catch (err) { toast('फ़ोटो नहीं ली जा सकी'); }
+  };
+  getGps();
+  onSite();
+  $('fSave').onclick = async () => {
+    const pl = { vehicle: $('fVeh').value, driverName: $('fDn').value.trim(), driverMobile: $('fDm').value.trim(), reading: $('fRead').value, litres: $('fLit').value, rate: $('fRate').value,
+      amount: $('fAmt').value, fullTank: $('fFull').checked, pump: $('fPump').value.trim(), slipNo: $('fSlip').value.trim(), remarks: $('fRem').value.trim(),
+      lat: F.gps ? F.gps.lat : '', lng: F.gps ? F.gps.lng : '', acc: F.gps ? F.gps.acc : '', photos: F.photos, phoneTs: new Date().toISOString(), clientId: 'F' + Date.now() + Math.random().toString(36).slice(2, 7) };
+    if (!pl.vehicle) return toast('गाड़ी चुनें');
+    if (!pl.driverName) return toast('ड्राइवर का नाम डालें');
+    if (pl.reading === '') return toast('मीटर रीडिंग डालें');
+    if (!(parseFloat(pl.litres) > 0)) return toast('डीज़ल लीटर डालें');
+    if (!F.photos.meter) return toast('मीटर की फ़ोटो लें');
+    if (!F.photos.slip) return toast('पंप स्लिप की फ़ोटो लें');
+    if (!F.gps && !confirm('लोकेशन नहीं मिली है। फिर भी सेव करें? (यह एंट्री जाँच में जाएगी)')) return;
+    if (pl.rate) store.set('fuelRate', pl.rate);
+    const b = $('fSave'); b.disabled = true; b.textContent = 'सेव हो रहा है…';
+    try { if (!navigator.onLine) throw new TypeError('offline'); const r = await api('fuelSave', pl); fuelDone(r, false); }
+    catch (e) { if (e instanceof TypeError || !navigator.onLine) { await Q.add({ action: 'fuelSave', payload: pl, at: Date.now() }); refreshQueueBar(); fuelDone({ id: '(नेटवर्क आने पर)', amount: pl.amount, vehicle: pl.vehicle, litres: pl.litres, pump: pl.pump }, true); }
+      else { toast(e.message); b.disabled = false; b.textContent = '✓ एंट्री सेव करें'; } }
+  };
+};
+function fuelDone(r, queued) {
+  const m = F.meta || {};
+  $app.innerHTML = `<div class="card" style="text-align:center"><div class="tick">✓</div><h2 style="margin:0">${queued ? 'एंट्री फ़ोन में सुरक्षित' : 'एंट्री सेव हो गई'}</h2>
+    <p class="muted">${queued ? 'नेटवर्क आते ही अपने-आप चली जाएगी, तब Entry ID मिलेगा।' : 'अब पेमेंट के लिए नीचे वाला बटन दबाएँ'}</p>
+    <div class="idbox"><small>ENTRY ID</small><strong>${esc(r.id)}</strong></div>
+    <div class="kpis" style="text-align:left"><div class="kpi"><div class="l">गाड़ी · डीज़ल</div><div class="v" style="font-size:16px">${esc(r.vehicle)} · ${esc(r.litres)} L</div></div><div class="kpi gold"><div class="l">राशि</div><div class="v">${inr2(r.amount)}</div></div></div>
+    ${queued ? '' : `<button id="wa" class="btn wa block" style="margin-top:14px">WhatsApp पर पेमेंट रिक्वेस्ट भेजें</button>`}
+    <a class="btn ghost block" style="margin-top:10px" href="#fuel?n=${Date.now()}">+ अगली एंट्री</a>
+    <div class="rule">🔒 <b>नियम:</b> बिना ऐप एंट्री के डीज़ल का पेमेंट नहीं होगा। पेमेंट रिक्वेस्ट में Entry ID होना ज़रूरी है।</div></div>`;
+  const wa = document.getElementById('wa');
+  if (wa) wa.onclick = () => { const msg = `*⛽ डीज़ल पेमेंट रिक्वेस्ट*\nEntry ID: *${r.id}*\nगाड़ी: ${r.vehicle}\nडीज़ल: ${r.litres} L\nराशि: *₹${Number(r.amount).toLocaleString('en-IN')}*\nपंप: ${r.pump || '-'}\nसुपरवाइज़र: ${state.user.name}`;
+    window.open('https://wa.me/' + (m.payWa || '') + '?text=' + encodeURIComponent(msg), '_blank'); };
+}
+function getGps() {
+  const g = document.getElementById('fGps'); if (!g) return; F.gps = null;
+  g.className = 'gps wait'; g.innerHTML = '<span class="dot"></span><span>लोकेशन ली जा रही है…</span>';
+  const bad = m => { g.className = 'gps bad'; g.innerHTML = `<span class="dot"></span><span>${m}</span><a id="gpsRetry">फिर कोशिश</a>`; document.getElementById('gpsRetry').onclick = getGps; };
+  if (!navigator.geolocation) return bad('इस फ़ोन में लोकेशन उपलब्ध नहीं');
+  navigator.geolocation.getCurrentPosition(p => { F.gps = { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) };
+    g.className = 'gps ok'; g.innerHTML = `<span class="dot"></span><span>लोकेशन मिल गई · ±${F.gps.acc} मीटर</span>`; }, () => bad('लोकेशन नहीं मिली — फ़ोन का GPS चालू करें'), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+function stampPhoto(file, veh) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height, max = 1280;
+      if (w >= h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(img, 0, 0, w, h);
+      const bar = Math.max(30, Math.round(w * 0.035)); x.fillStyle = 'rgba(11,31,58,.8)'; x.fillRect(0, h - bar, w, bar);
+      x.fillStyle = '#E6C674'; x.font = '700 ' + Math.round(bar * 0.46) + 'px Inter, sans-serif';
+      x.fillText('CE FUEL · ' + (veh || '') + ' · ' + new Date().toLocaleString('en-IN') + (F.gps ? ' · ' + F.gps.lat.toFixed(5) + ', ' + F.gps.lng.toFixed(5) : ' · NO GPS'), 12, h - Math.round(bar * 0.32));
+      URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = rej; img.src = URL.createObjectURL(file);
+  });
+}
+
+// ───────────── 🛡️ Diesel control room (Owner / Admin / Firm staff) ─────────────
+routes.fuelroom = async function (p) {
+  if (!can('fuelView')) return go('home');
+  spinner();
+  const month = p.m || new Date().toISOString().slice(0, 7);
+  const d = await api('fuelDashboard', { month, site: p.site || '' });
+  const k = d.kpi, unit = m => m === 'HR' ? ' L/hr' : ' km/L';
+  const photoLinks = x => `<span class="links">${x.meterPhoto ? `<a data-ph="${x.meterPhoto}">मीटर</a>` : ''}${x.slipPhoto ? `<a data-ph="${x.slipPhoto}">स्लिप</a>` : ''}${x.pumpPhoto ? `<a data-ph="${x.pumpPhoto}">पंप</a>` : ''}</span>`;
+  const max = Math.max(1, ...d.daily.map(x => x.l));
+  $app.innerHTML = `
+    <div class="print-only lh"><div><b>Choudhary Enterprises</b><div class="small muted">Diesel Control Report · ${esc(d.month)}</div></div><div class="small">${esc(d.generated)}<br>System by ${esc(CFG.FIRM_NAME)}</div></div>
+    <h2>🛡️ ${t('fuelRoom')}</h2>
+    <div class="row wrap no-print" style="margin-bottom:12px"><input type="month" id="fm" value="${esc(d.month)}" style="flex:1 1 150px"><select id="fs" style="flex:1 1 150px"><option value="">सभी साइट</option>${d.sites.map(x => `<option value="${esc(x.code)}" ${x.code === p.site ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><button id="fp" class="btn sm ghost" style="flex:0 0 auto">🖨️ ${t('print')}</button></div>
+    ${d.setup.vehicles ? '' : `<div class="health warn"><span class="dot"></span>अभी Vehicles शीट खाली है — गाड़ियाँ, टंकी क्षमता और मानक एवरेज भरें।</div>`}
+    <div class="kpis">
+      <div class="kpi gold"><div class="l">कुल डीज़ल</div><div class="v">${Math.round(k.litres).toLocaleString('en-IN')} L</div></div>
+      <div class="kpi"><div class="l">कुल खर्च · ₹${k.rate}/L</div><div class="v">${inr(k.amount)}</div></div>
+      <div class="kpi" style="--c:#3B82F6"><div class="l">भराई · WATCH ${k.watch}</div><div class="v">${k.entries}</div></div>
+      <div class="kpi out"><div class="l">RED अलर्ट</div><div class="v">${k.red}</div></div>
+      <div class="kpi" style="--c:#6366F1;grid-column:1/-1"><div class="l">पेंडिंग पेमेंट · ${k.pendingCount} एंट्री</div><div class="v">${inr(k.pendingAmt)}</div></div>
+    </div>
+    <h3>गाड़ी-वार रिस्क रडार</h3>
+    <div class="card" style="padding:0"><div class="tw"><table class="led"><thead><tr><th>गाड़ी</th><th class="n">भराई</th><th class="n">लीटर</th><th class="n">मीटर रन</th><th class="n">GPS रन</th><th class="n">अंतर</th><th class="n">एवरेज</th><th class="n">मानक</th><th class="n">विचलन</th><th>स्थिति</th></tr></thead><tbody>
+      ${d.vehicles.map(v => { const bad = v.dev !== '' && ((v.meter === 'KM' && v.dev < 0) || (v.meter === 'HR' && v.dev > 0));
+        return `<tr><td><b>${esc(v.no)}</b><div class="small muted">${esc(v.type)} · ${esc(v.site)}</div></td><td class="n">${v.fills}</td><td class="n">${v.litres}</td><td class="n">${v.run}</td><td class="n">${v.gps || '—'}</td>
+        <td class="n">${v.gap !== '' ? `<span class="dev ${Math.abs(v.gap) > 10 ? 'bad' : 'good'}">${v.gap > 0 ? '+' : ''}${v.gap}%</span>` : '—'}</td><td class="n">${v.avg !== '' ? v.avg + '<span class="small muted">' + unit(v.meter) + '</span>' : '—'}</td><td class="n">${v.std || '—'}</td>
+        <td class="n">${v.dev !== '' ? `<span class="dev ${bad ? 'bad' : 'good'}">${v.dev > 0 ? '+' : ''}${v.dev}%</span>` : '—'}</td><td><span class="badge ${v.status}">${v.status === 'RED' ? 'संदिग्ध' : 'सामान्य'}</span></td></tr>`; }).join('') || `<tr><td colspan="10" class="center muted">इस महीने कोई एंट्री नहीं</td></tr>`}
+    </tbody></table></div></div>
+    <h3>रोज़ का डीज़ल (लीटर)</h3>
+    <div class="card"><div class="chart">${d.daily.map(x => `<div class="col" title="${x.d} — ${x.l} L"><div style="height:${Math.round(x.l / max * 100)}%"></div><span>${x.d}</span></div>`).join('') || '<div class="muted" style="margin:auto">डेटा नहीं</div>'}</div></div>
+    <h3>अलर्ट (RED / WATCH)</h3>
+    <div>${d.alerts.map(x => `<div class="alert ${x.risk}"><div class="row"><div><b>${esc(x.vehicle)}</b> <span class="small muted">· ${esc(x.id)} · ${fmtDT(x.ts)}</span></div><span class="badge ${x.risk}" style="flex:0 0 auto">${x.risk}</span></div><ul>${x.flags.map(f => `<li>${esc(f)}</li>`).join('')}</ul><div class="small muted">${x.litres} L · ${inr(x.amount)} · सुपरवाइज़र: ${esc(x.sup)}</div><div style="margin-top:6px">${photoLinks(x)}</div></div>`).join('') || '<div class="card center muted">✅ कोई अलर्ट नहीं</div>'}</div>
+    <h3>पेंडिंग पेमेंट</h3>
+    <div class="card list">${d.pending.map(x => `<div class="item" style="cursor:default"><span class="ic">⛽</span><div class="main"><div class="t">${esc(x.id)} · ${esc(x.vehicle)}</div><div class="s">${fmtDT(x.ts)} · ${esc(x.pump)} ${x.slip ? '· स्लिप ' + esc(x.slip) : ''} · ${x.litres} L</div><div style="margin-top:4px">${photoLinks(x)} <span class="badge ${x.risk}">${x.risk}</span></div></div><div style="text-align:right"><div class="amt">${inr(x.amount)}</div>${can('fuelPay') ? `<button class="btn sm" data-pay="${esc(x.id)}" data-amt="${x.amount}" data-risk="${x.risk}" style="margin-top:6px">Paid ✓</button>` : ''}</div></div>`).join('') || '<div class="center muted">कोई पेंडिंग पेमेंट नहीं</div>'}</div>
+    <h3>सभी एंट्री</h3>
+    <div class="card" style="padding:0"><div class="tw"><table class="led"><thead><tr><th>Entry</th><th>गाड़ी</th><th class="n">पिछली</th><th class="n">अभी</th><th class="n">रन</th><th class="n">लीटर</th><th class="n">राशि</th><th class="n">एवरेज</th><th>रिस्क</th><th>पेमेंट</th></tr></thead><tbody>
+      ${d.entries.map(x => `<tr><td><b>${esc(x.id)}</b><div class="small muted">${fmtDT(x.ts)} · ${esc(x.driver)}</div></td><td>${esc(x.vehicle)}</td><td class="n">${x.prev}</td><td class="n">${x.cur}</td><td class="n">${x.run}</td><td class="n">${x.litres}</td><td class="n">${inr(x.amount)}</td><td class="n">${x.avg !== '' ? x.avg : '—'}</td><td><span class="badge ${x.risk}">${x.risk}</span></td><td><span class="badge ${x.pay}">${x.pay}</span></td></tr>`).join('') || `<tr><td colspan="10" class="center muted">कोई एंट्री नहीं</td></tr>`}
+    </tbody></table></div></div>
+    <div class="foot">रिपोर्ट समय: ${esc(d.generated)} · System by <b>${esc(CFG.FIRM_NAME)}</b></div>`;
+  const nav = () => go(`fuelroom?m=${document.getElementById('fm').value}&site=${encodeURIComponent(document.getElementById('fs').value)}`);
+  document.getElementById('fm').onchange = nav; document.getElementById('fs').onchange = nav;
+  document.getElementById('fp').onclick = () => window.print();
+  document.querySelectorAll('[data-ph]').forEach(a => a.onclick = () => openFile(a.dataset.ph, 'open'));
+  document.querySelectorAll('[data-pay]').forEach(b => b.onclick = async () => {
+    if (b.dataset.risk === 'RED' && !confirm('⚠ यह RED अलर्ट वाली एंट्री है। फ़ोटो जाँच ली? फिर भी Paid करें?')) return;
+    const utr = prompt(`Entry ${b.dataset.pay} · ${inr(b.dataset.amt)}\nUTR / रेफ़रेंस नंबर डालें:`); if (utr === null) return;
+    try { await api('fuelMarkPaid', { id: b.dataset.pay, utr }); toast('Paid ✓ दर्ज हुआ'); render(); } catch (e) { toast(e.message); }
+  });
+};
+
 // ───────────── Install prompt ─────────────
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; });
@@ -473,10 +677,10 @@ function bindInstall() { const b = document.getElementById('inst'); if (b) b.onc
 // ───────────── DEMO backend (only when API_URL is empty) ─────────────
 const Demo = (function () {
   const users = {
-    OWNER: { id: 'U1', name: 'Choudhary ji', mobile: '9001909999', email: '', role: 'OWNER', roleLabel: 'Owner (Choudhary ji)', site: 'Head Office', perms: ['invoices', 'upload', 'uploadsAll', 'requestsAll', 'ledgers', 'dashboard'], hasPin: true },
-    CLIENT_STAFF: { id: 'U2', name: 'Site Munim (Atik)', mobile: '9876500001', email: '', role: 'CLIENT_STAFF', roleLabel: 'Site Staff', site: 'Atik Site', perms: ['invoices', 'upload'], hasPin: true },
-    ADMIN: { id: 'U3', name: 'Chandresh Jagetia', mobile: '', email: 'admin@example.com', role: 'ADMIN', roleLabel: 'Admin (P Jagetia & Associates)', site: 'Office', perms: ['invoices', 'upload', 'uploadsAll', 'uploadsReview', 'requestsAll', 'requestsManage', 'ledgers', 'dashboard', 'users'], hasPin: false },
-    FIRM_STAFF: { id: 'U4', name: 'Office Staff', mobile: '9876500002', email: '', role: 'FIRM_STAFF', roleLabel: 'Firm Staff', site: 'Office', perms: ['invoices', 'upload', 'uploadsAll', 'uploadsReview', 'requestsAll', 'requestsManage', 'ledgers', 'dashboard'], hasPin: true }
+    OWNER: { id: 'U1', name: 'Choudhary ji', mobile: '9001909999', email: '', role: 'OWNER', roleLabel: 'Owner (Choudhary ji)', site: 'Head Office', perms: ['invoices', 'upload', 'uploadsAll', 'requestsAll', 'ledgers', 'dashboard', 'fuelView'], hasPin: true },
+    CLIENT_STAFF: { id: 'U2', name: 'Supervisor Talasari', mobile: '9876500001', email: '', role: 'CLIENT_STAFF', roleLabel: 'Site Staff', site: 'TLS', perms: ['invoices', 'upload', 'fuelEntry'], hasPin: true, fuelEntry: 'Y' },
+    ADMIN: { id: 'U3', name: 'Chandresh Jagetia', mobile: '', email: 'admin@example.com', role: 'ADMIN', roleLabel: 'Admin (P Jagetia & Associates)', site: 'Office', perms: ['invoices', 'upload', 'uploadsAll', 'uploadsReview', 'requestsAll', 'requestsManage', 'ledgers', 'dashboard', 'users', 'fuelEntry', 'fuelView', 'fuelPay', 'syncHealth'], hasPin: false, fuelEntry: 'Y' },
+    FIRM_STAFF: { id: 'U4', name: 'Office Staff', mobile: '9876500002', email: '', role: 'FIRM_STAFF', roleLabel: 'Firm Staff', site: 'Office', perms: ['invoices', 'upload', 'uploadsAll', 'uploadsReview', 'requestsAll', 'requestsManage', 'ledgers', 'dashboard', 'fuelView', 'fuelPay'], hasPin: true }
   };
   const invoices = [
     ['CE-GJ-118 Shrinathji Stone Quarry Oct-2026.pdf', 'SALE / GUJARAT / 10 OCT', '2026-27'], ['CE-RJ-245 Rb Ghodke Infrastructure Oct-2026.pdf', 'SALE / RAJASTHAN / 10 OCT', '2026-27'],
@@ -522,8 +726,18 @@ const Demo = (function () {
           let bal = 915600; rows.forEach(r => { bal += r.debit - r.credit; r.balance = bal; });
           return ok({ ledger: { company: L.company, name: L.name, group: L.group, opening: 915600, closing: L.closing, gstin: '08ABCDE1234F1Z5' }, rows, syncedAt: '2026-11-15T07:00:00' });
         }
-        case 'dashboard': return ok({ syncedAt: '2026-11-15T07:00:00', banks: [{ name: 'HDFC Bank CA Buldhana', balance: 2310450 }, { name: 'MGB Bank', balance: 84200 }], lastDay: { date: '2026-11-14', inTotal: 640000, outTotal: 287300, items: [{ bank: 'HDFC Bank CA Buldhana', party: 'Rb Ghodke Infrastructure', in: 640000, out: 0, narration: 'RTGS' }, { bank: 'HDFC Bank CA Buldhana', party: 'Indian Oil Pump', in: 0, out: 148300, narration: 'Diesel' }, { bank: 'HDFC Bank CA Buldhana', party: 'Tata Capital EMI', in: 0, out: 139000, narration: 'EMI' }] }, week: { inTotal: 1890000, outTotal: 1214500 }, debtorsTotal: 3346250, topDebtors: ledgers.filter(l => l.group === 'Sundry Debtors').map(l => ({ name: l.name, amount: l.closing })), creditorsTotal: 214500, invoicesThisMonth: 4, openRequests: requests.filter(r => r.status !== 'Done').length, newUploads: uploads.filter(u => u.status === 'New').length });
+        case 'dashboard': return ok({ syncedAt: '2026-11-15T07:00:00', banks: [{ name: 'HDFC Bank CA Buldhana', balance: 2310450 }, { name: 'MGB Bank', balance: 84200 }], lastDay: { date: '2026-11-14', inTotal: 640000, outTotal: 287300, items: [{ bank: 'HDFC Bank CA Buldhana', party: 'Rb Ghodke Infrastructure', in: 640000, out: 0, narration: 'RTGS' }, { bank: 'HDFC Bank CA Buldhana', party: 'Indian Oil Pump', in: 0, out: 148300, narration: 'Diesel' }, { bank: 'HDFC Bank CA Buldhana', party: 'Tata Capital EMI', in: 0, out: 139000, narration: 'EMI' }] }, week: { inTotal: 1890000, outTotal: 1214500 }, debtorsTotal: 3346250, topDebtors: ledgers.filter(l => l.group === 'Sundry Debtors').map(l => ({ name: l.name, amount: l.closing })), creditorsTotal: 214500, invoicesThisMonth: 4, sync: { time: '2026-11-21T08:00:12', status: 'OK', note: 'all 595 ledgers match Tally closing', ledgers: 828, entries: 10302, ageMin: 42 }, fuel: me.perms.includes('fuelView') ? { todayL: 410, todayAmt: 37720, todayN: 3, monthL: 18640, monthAmt: 1714880, red: 2, pendingAmt: 92400, pendingN: 4 } : null, openRequests: requests.filter(r => r.status !== 'Done').length, newUploads: uploads.filter(u => u.status === 'New').length });
         case 'listUsers': return ok({ items: Object.values(users).map(u => Object.assign({ active: 'Y' }, u)), roles: Object.keys(users).map(k => ({ key: k, label: users[k].roleLabel })) });
+        case 'fuelMeta': return ok({ sites: [{ code: 'TLS', name: 'Talasari Site', pumps: ['Shree Petroleum'] }], vehicles: [{ no: 'MH48AB1234', type: 'Dumper', site: 'TLS', meter: 'KM', tank: 300 }, { no: 'MH48CD5678', type: 'Dumper', site: 'TLS', meter: 'KM', tank: 300 }, { no: 'EX-210', type: 'Excavator', site: 'TLS', meter: 'HR', tank: 400 }], payWa: '918005535005' });
+        case 'fuelVehicleStatus': return ok({ prev: 45120, first: false, meter: b.vehicle === 'EX-210' ? 'HR' : 'KM', tank: 300, lastAt: '20 Nov 2026, 06:40 PM' });
+        case 'fuelSave': return ok({ id: 'CE-261121-0042', amount: b.amount, vehicle: b.vehicle, litres: b.litres, pump: b.pump });
+        case 'fuelMarkPaid': return ok({});
+        case 'fuelDashboard': {
+          const e = (id, v, lit, amt, risk, flags, pay, avg) => ({ id, ts: '2026-11-' + id.slice(-2) + 'T09:15:00', vehicle: v, driver: 'Ramesh', prev: 45000, cur: 45350, run: 350, litres: lit, amount: amt, avg, risk, flags, pay, pump: 'Shree Petroleum', slip: '88' + id.slice(-2), sup: 'Supervisor Talasari', meterPhoto: 'x', slipPhoto: 'x' });
+          const entries = [e('CE-261120-0019', 'MH48CD5678', 210, 19320, 'RED', ['एवरेज 1.67 km/L — मानक 3 से कम', 'पंप से 6.4 km दूर से एंट्री'], 'PENDING', 1.67), e('CE-261120-0018', 'MH48AB1234', 120, 11040, 'WATCH', ['पिछली भराई के सिर्फ़ 5.2 घंटे बाद दोबारा'], 'PENDING', 2.9), e('CE-261119-0017', 'EX-210', 180, 16560, 'OK', [], 'PAID', 14.2), e('CE-261118-0016', 'MH48AB1234', 115, 10580, 'OK', [], 'PAID', 3.1)];
+          return ok({ month: b.month, kpi: { litres: 18640, amount: 1714880, entries: 64, red: 2, watch: 5, pendingAmt: 92400, pendingCount: 4, rate: 92 }, vehicles: [{ no: 'MH48CD5678', type: 'Dumper', site: 'TLS', meter: 'KM', fills: 18, litres: 4210, amount: 387320, run: 7150, avg: 1.7, std: 3, dev: -43.3, gps: 9120, gap: -21.6, red: 2, status: 'RED' }, { no: 'MH48AB1234', type: 'Dumper', site: 'TLS', meter: 'KM', fills: 21, litres: 3890, amount: 357880, run: 11500, avg: 2.96, std: 3, dev: -1.3, gps: 11620, gap: -1, red: 0, status: 'OK' }, { no: 'EX-210', type: 'Excavator', site: 'TLS', meter: 'HR', fills: 12, litres: 2650, amount: 243800, run: 188, avg: 14.1, std: 15, dev: -6, gps: '', gap: '', red: 0, status: 'OK' }],
+            daily: Array.from({ length: 20 }, (_, i) => ({ d: String(i + 1).padStart(2, '0'), l: 700 + ((i * 137) % 500) })), entries, alerts: entries.filter(x => x.risk !== 'OK'), pending: entries.filter(x => x.pay !== 'PAID'), sites: [{ code: 'TLS', name: 'Talasari Site' }], setup: { vehicles: 3, sites: 1 }, generated: '21 Nov 2026, 09:30 AM' });
+        }
         default: return ok({});
       }
     }

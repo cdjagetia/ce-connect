@@ -753,8 +753,11 @@ function renderDemoBar() {
 }
 
 // ───────────── Boot ─────────────
+// shared helpers for add-on modules (labour.js …)
+window.CE = { api, routes, state, t, esc, inr, inr2, fmtDate, fmtDT, can, toast, spinner, go, render, Q, refreshQueueBar, openFile, store, CFG };
 if ('serviceWorker' in navigator && !DEMO && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-render();
+const boot = () => render();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 // Refresh role/permissions from the server on every open, so changes reach users without re-login
 if (state.token && !DEMO) api('me').then(r => { if (r && r.user) { state.user = r.user; store.set('user', r.user); render(); } }).catch(() => {});
 flushQueue();

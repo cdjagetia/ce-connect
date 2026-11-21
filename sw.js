@@ -1,7 +1,7 @@
 // CE Connect service worker — caches the app shell so it opens fast and works on weak site networks.
 // API calls (script.google.com) are never cached.
-const CACHE = 'ce-connect-v2';
-const SHELL = ['./', './index.html', './style.css', './app.js', './config.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'ce-connect-v3';
+const SHELL = ['./', './index.html', './style.css', './app.js', './labour.js', './config.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

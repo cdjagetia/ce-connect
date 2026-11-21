@@ -730,24 +730,24 @@ routes.home = async function () {
   const u = CE.state.user || {};
   if (u.role === 'WORKER') return workerHome(u);
   await baseHome();
-  const tiles = document.querySelector('.tiles'); if (!tiles) return;
+  const tiles = document.querySelector('.tiles'); if (!tiles || tiles.querySelector('[href="#labour"],[href="#duty"]')) return;
   const add = [];
   if (can('labourManage') || can('labourView')) add.push(['labour', '👷', 'लेबर / हाज़िरी', 'हाज़िरी, वेतन, एडवांस, रिपोर्ट', 'gold']);
   if (can('duty') && (can('labourManage'))) add.push(['duty', '🤳', 'मेरी ड्यूटी', 'सेल्फ़ी से हाज़िरी']);
   tiles.insertAdjacentHTML('afterbegin', add.map(x => `<a class="tile ${x[4] || ''}" href="#${x[0]}"><span class="ic">${x[1]}</span>${esc(x[2])}<small>${esc(x[3])}</small></a>`).join(''));
   // labour card
-  const host = document.getElementById('homeFuel'); if (!host) return;
+  const host = document.getElementById('homeFuel'); if (!host || document.querySelector('.lcard')) return;
   const card = s => `<a class="card lcard" href="#labour" style="margin-top:0"><div class="row"><div><div class="sec">👷 लेबर · आज</div><div class="big" style="font-size:22px">${s.present} / ${s.total} हाज़िर</div><div class="small muted">ड्यूटी पर ${s.onDuty} · नहीं आए ${s.absent} · जाँच बाक़ी ${s.pending}${s.cost !== undefined ? ' · ख़र्च ' + inr(s.cost) : ''}</div></div><div style="flex:0 0 auto;text-align:right">${s.flagged ? `<span class="badge RED">🔴 ${s.flagged}</span><br>` : ''}${s.pendingTxn ? `<span class="badge WATCH" style="margin-top:4px">💵 ${s.pendingTxn}</span>` : ''}</div></div></a>`;
   if (can('dashboard')) {
     // dashboard() already called by base; fetch labour mini separately only if not included
     try { const d = await api('labourData', { view: 'today' }); const s = { total: 0, present: 0, onDuty: 0, absent: 0, pending: 0, flagged: 0, cost: 0, pendingTxn: d.pendingTxn.length };
       d.sites.forEach(x => { s.total += x.total; s.present += x.present; s.onDuty += x.onDuty; s.absent += x.absent.length; s.pending += x.pending; s.flagged += x.flagged; s.cost += x.cost; });
       if (!(can('labourView') || can('labourPay'))) delete s.cost;
-      host.insertAdjacentHTML('afterend', card(s)); } catch (e) {}
+      if (!document.querySelector('.lcard') && document.getElementById('homeFuel') === host) host.insertAdjacentHTML('afterend', card(s)); } catch (e) {}
   } else if (can('labourManage')) {
     try { const d = await api('labourData', { view: 'today' }); const s = { total: 0, present: 0, onDuty: 0, absent: 0, pending: 0, flagged: 0, pendingTxn: d.pendingTxn.length };
       d.sites.forEach(x => { s.total += x.total; s.present += x.present; s.onDuty += x.onDuty; s.absent += x.absent.length; s.pending += x.pending; s.flagged += x.flagged; });
-      host.insertAdjacentHTML('afterend', card(s)); } catch (e) {}
+      if (!document.querySelector('.lcard') && document.getElementById('homeFuel') === host) host.insertAdjacentHTML('afterend', card(s)); } catch (e) {}
   }
 };
 async function workerHome(u) {
